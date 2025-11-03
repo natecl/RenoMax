@@ -24,7 +24,7 @@ API_KEY= os.getenv("RENTCAST_API_KEY", "YOUR_API_KEY_HERE")
 
 def build_rentcast_url(zipcode: str, Limit: int) -> tuple[str, dict]:
     base="https://api.rentcase.io/v1/properties"
-    url= f"{base}?postalCode={zipcode}&limit={limit}"
+    url= f"{base}?postalCode={zipcode}&limit={Limit}"
 
     headers = {
         "accept": "application/json",
@@ -57,6 +57,7 @@ def simplify_properties(raw: list[dict]) -> list[dict]:
     return simplified
 
 @app.get("/housing/{zipcode}")
+
 def get_housing_by_zip(
     zipcode: str,
     limit: int= Query(10, ge=1, le=100, description= "Max number of properties to return (1-100)"),
@@ -72,9 +73,20 @@ def get_housing_by_zip(
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=502, detail=f"Upstream request failed: {e!s}")
 
-    if response.status_code != 401:
+    if response.status_code == 401:
         raise HTTPException(status_code=502, detail="Provider rejected API key (401 Unauthorized).")
     if response.status_code == 429:
         raise HTTPException(status_code=502, detail="Rate limit exceeded by provider (429 Too Many Requests).")
     if response.status_code >= 400:
         raise HTTPException(status_code=502, detail=f"Provider error: HTTP {response.status_code}")
+
+    try:
+        data = response.json()
+    except ValueError:
+        raise HTTPException(status_code=502, detail="Provider returned invalid JSON.")
+    
+    if not isinstance(data, list):
+        data= data.get("properties") if isinstance(data, dict) else []
+
+    return data if raw else simplify_properties(data)
+    
