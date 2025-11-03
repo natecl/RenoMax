@@ -20,3 +20,6 @@ backend/.env
 
 # VS Code
 .vscode/
+
+.venv/
+backend/.venv/
