@@ -5,6 +5,8 @@ __pycache__/
 # Virtual environments
 venv/
 backend/venv/
+.venv/
+backend/.venv/
 
 # Node.js (React)
 frontend/node_modules/
@@ -20,6 +22,3 @@ backend/.env
 
 # VS Code
 .vscode/
-
-.venv/
-backend/.venv/
