@@ -23,7 +23,7 @@ def root():
 API_KEY= os.getenv("RENTCAST_API_KEY", "YOUR_API_KEY_HERE")
 
 def build_rentcast_url(zipcode: str, Limit: int) -> tuple[str, dict]:
-    base="https://api.rentcase.io/v1/properties"
+    base="https://api.rentcast.io/v1/properties"
     url= f"{base}?postalCode={zipcode}&limit={Limit}"
 
     headers = {
