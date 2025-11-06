@@ -94,3 +94,20 @@ from sklearn.ensemble import IsolationForest
 import pandas as pd
 import numpy as np
 
+@app.get("/anomalies/{zipcode}")
+def detect_anomalies(
+    zipcode: str,
+    limit: int= Query(50, ge=5, le=200, description="Number of properties to analyze")
+):
+    data= get_housing_by_zip(zipcode, limit=limit, raw=False)
+
+    if not data:
+        raise HTTPException(status_code=404, detail="No housing data found for this ZIP code.")
+    
+    df=pd.DataFrame(data)
+
+'''
+    numeric_cols= ["bedrooms", "bathrooms", "sqft", "price"]
+    df=df[[col for col in numeric_cols if col in df.columns]].copy()
+
+'''
