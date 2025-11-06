@@ -90,3 +90,7 @@ def get_housing_by_zip(
 
     return data if raw else simplify_properties(data)
     
+from sklearn.ensemble import IsolationForest
+import pandas as pd
+import numpy as np
+
