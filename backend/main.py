@@ -106,8 +106,37 @@ def detect_anomalies(
     
     df=pd.DataFrame(data)
 
-'''
     numeric_cols= ["bedrooms", "bathrooms", "sqft", "price"]
     df=df[[col for col in numeric_cols if col in df.columns]].copy()
 
-'''
+    df = df.dropna()
+    if df.empty:
+        raise HTTPException(status_code=400, detail="Not enough data to analyze anomalies.")
+    
+    model = IsolationForest(contamination=0.1, random_state=42)
+    df["anomaly_score"]= model.fit_predict(df)
+
+    '''
+    Isolation forest model is a unsupervised anomaly detection model that randomly partitions data and isolates points that are easier to separate.
+    '''
+    df["is_anomaly"]=df["anomaly_score"]==-1
+
+    anomalies = df[df["is_anomaly"]].to_dict(orient="records")
+    normal = df[~df["is_anomaly"]].to_dict(orient="records")
+
+    return {
+        "zipcode": zipcode,
+        "total_homes_analyzed": len(df),
+        "anomalies_found": len(anomalies),
+        "anomalous_homes": anomalies,
+        "normal_homes": normal[:5],
+    }
+
+#Regression model for adjusted feature prediction
+
+from sklearn.ensemble import RandomForestRegressor
+
+@app.get("/predict_price/{zipcode}")
+def predict_price_adjustment(
+
+)
