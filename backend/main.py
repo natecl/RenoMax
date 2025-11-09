@@ -164,12 +164,30 @@ def predict_price_adjustment(
 
     model= RandomForestRegressor(
         n_estimators=100,
-        random_state=42
+        random_state=42,
         max_depth=None,
         n_jobs=-1
     )
 
     model.fit(X,y)
 
-    
+    avg_house= df[features].mean().to_dict()
+    base_price= model.predict([list(avg_house.values())])[0]
 
+    adjusted_house= avg_house.copy()
+    adjusted_house["bedrooms"] += add_bedrooms
+    adjusted_house["bathrooms"] += add_bathrooms
+
+    adjusted_price=model.predict([list(adjusted_house.values())])[0]
+
+    return {
+        "zipcode": zipcode,
+        "base_price": round(base_price, 2),
+        "adjusted_price": round(adjusted_price, 2),
+        "feature_change": {
+            "added_bedrooms": add_bedrooms,
+            "added_bathrooms": add_bathrooms
+        },
+        "estimated_increase": round(adjusted_price - base_price, 2),
+        "feature_importance": dict(zip(features, model.feature_importances_.round(3).tolist()))
+    }
