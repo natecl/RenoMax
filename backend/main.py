@@ -138,5 +138,38 @@ from sklearn.ensemble import RandomForestRegressor
 
 @app.get("/predict_price/{zipcode}")
 def predict_price_adjustment(
+    zipcode: str,
+    limit: int= Query(50, ge=5, le=200),
+    add_bedrooms: int= Query(0),
+    add_bathrooms: int= Query(0)
+):
 
-)
+    data= get_housing_by_zip(zipcode, limit=limit, raw=False)
+
+    if not data:
+        raise HTTPException(status_code=404, detail="No housing data found for this ZIP code.")
+
+    df = pd.DataFrame(data)
+
+    features= ["bedrooms", "bathrooms", "sqft"]
+    target= "price"
+
+    df= df[[*features, target]].dropna()
+
+    if df.empty:
+        raise HTTPException(statys_code=400, detail="Insufficient clean data to train model.")
+    
+    X = df[features]
+    y = df[target]
+
+    model= RandomForestRegressor(
+        n_estimators=100,
+        random_state=42
+        max_depth=None,
+        n_jobs=-1
+    )
+
+    model.fit(X,y)
+
+    
+
