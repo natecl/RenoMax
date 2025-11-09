@@ -90,104 +90,57 @@ def get_housing_by_zip(
 
     return data if raw else simplify_properties(data)
     
-from sklearn.ensemble import IsolationForest
+from sklearn.ensemble import IsolationForest, RandomForestRegressor
 import pandas as pd
 import numpy as np
 
 @app.get("/anomalies/{zipcode}")
-def detect_anomalies(
+def detect_anomalies_and_simulate_fix(
     zipcode: str,
     limit: int= Query(50, ge=5, le=200, description="Number of properties to analyze")
 ):
-    data= get_housing_by_zip(zipcode, limit=limit, raw=False)
+    data = get_housing_by_zip(zipcode, limit=limit, raw=False)
 
     if not data:
         raise HTTPException(status_code=404, detail="No housing data found for this ZIP code.")
     
-    df=pd.DataFrame(data)
+    df =pd.DataFrame(data)
 
-    numeric_cols= ["bedrooms", "bathrooms", "sqft", "price"]
-    df=df[[col for col in numeric_cols if col in df.columns]].copy()
+    numeric_cols=["bedrooms", "bathrooms", "sqft", "price"]
 
-    df = df.dropna()
-    if df.empty:
-        raise HTTPException(status_code=400, detail="Not enough data to analyze anomalies.")
+    df=df[[col for col in numeric_cols if col in df.columns]].dropna()
+
+    if df.empty or len(df) < 10:
+        raise HTTPException(status_code=400, detail="Not enough clean data to analyze anomalies.")
     
-    model = IsolationForest(contamination=0.1, random_state=42)
-    df["anomaly_score"]= model.fit_predict(df)
+    X= df[['bedrooms', 'bathrooms', 'sqft']]
+    y= df['price']
 
-    '''
-    Isolation forest model is a unsupervised anomaly detection model that randomly partitions data and isolates points that are easier to separate.
-    '''
-    df["is_anomaly"]=df["anomaly_score"]==-1
+    rf= RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+    rf.fit(X,y)
 
-    anomalies = df[df["is_anomaly"]].to_dict(orient="records")
-    normal = df[~df["is_anomaly"]].to_dict(orient="records")
+    df["predicted_price"]= rf.predict(X)
+    df["price_diff"]= df["price"]-df["predicted_price"]
 
-    return {
-        "zipcode": zipcode,
-        "total_homes_analyzed": len(df),
-        "anomalies_found": len(anomalies),
-        "anomalous_homes": anomalies,
-        "normal_homes": normal[:5],
-    }
+    features_for_anomaly= ["bedrooms", "bathrooms", "sqft", "price_diff"]
+    iso=IsolationForest(contamination=0.1, random_state=42)
 
-#Regression model for adjusted feature prediction
-
-from sklearn.ensemble import RandomForestRegressor
-
-@app.get("/predict_price/{zipcode}")
-def predict_price_adjustment(
-    zipcode: str,
-    limit: int= Query(50, ge=5, le=200),
-    add_bedrooms: int= Query(0),
-    add_bathrooms: int= Query(0)
-):
-
-    data= get_housing_by_zip(zipcode, limit=limit, raw=False)
-
-    if not data:
-        raise HTTPException(status_code=404, detail="No housing data found for this ZIP code.")
-
-    df = pd.DataFrame(data)
-
-    features= ["bedrooms", "bathrooms", "sqft"]
-    target= "price"
-
-    df= df[[*features, target]].dropna()
-
-    if df.empty:
-        raise HTTPException(statys_code=400, detail="Insufficient clean data to train model.")
+    df["anomaly_score"]= iso.fit_predict(df[features_for_anomaly])
+    df["is_anomaly"]= df["anomaly_score"]==-1
     
-    X = df[features]
-    y = df[target]
+    avg_features=df[["bedrooms", "bathrooms", "sqft"]].mean().to_dict()
 
-    model= RandomForestRegressor(
-        n_estimators=100,
-        random_state=42,
-        max_depth=None,
-        n_jobs=-1
-    )
+    upgraded_records=[]
 
-    model.fit(X,y)
+    for _,row in df[df["is_anomaly"]].iterrows():
+        original=row.to_dict()
 
-    avg_house= df[features].mean().to_dict()
-    base_price= model.predict([list(avg_house.values())])[0]
+        added_features={}
+        adjusted_features={
+            "bedrooms":row["bedrooms"],
+            "bathrooms": row["bathrooms"],
+            "sqft": row["sqft"]
+        }
 
-    adjusted_house= avg_house.copy()
-    adjusted_house["bedrooms"] += add_bedrooms
-    adjusted_house["bathrooms"] += add_bathrooms
-
-    adjusted_price=model.predict([list(adjusted_house.values())])[0]
-
-    return {
-        "zipcode": zipcode,
-        "base_price": round(base_price, 2),
-        "adjusted_price": round(adjusted_price, 2),
-        "feature_change": {
-            "added_bedrooms": add_bedrooms,
-            "added_bathrooms": add_bathrooms
-        },
-        "estimated_increase": round(adjusted_price - base_price, 2),
-        "feature_importance": dict(zip(features, model.feature_importances_.round(3).tolist()))
-    }
+    
+        
