@@ -3,11 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 import requests
 import os
 from dotenv import load_dotenv
+from sklearn.ensemble import IsolationForest, RandomForestRegressor
+import pandas as pd
+import numpy as np
 
+# Load environment variables
 load_dotenv()
 
 app = FastAPI()
 
+# Enable CORS (so frontend can call the backend)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,17 +25,24 @@ app.add_middleware(
 def root():
     return {"message": "Backend is running!"}
 
-API_KEY= os.getenv("RENTCAST_API_KEY", "YOUR_API_KEY_HERE")
 
-def build_rentcast_url(zipcode: str, Limit: int) -> tuple[str, dict]:
-    base="https://api.rentcast.io/v1/properties"
-    url= f"{base}?postalCode={zipcode}&limit={Limit}"
+# --- RENTCAST CONFIG ---
+API_KEY = os.getenv("RENTCAST_API_KEY", "YOUR_API_KEY_HERE")
+
+def build_rentcast_url(zipcode: str, limit: int, radius: int = 10) -> tuple[str, dict]:
+    """
+    Build a RentCast API URL that retrieves all properties within a radius (in miles)
+    around the given ZIP code. This increases data density for analysis.
+    """
+    base = "https://api.rentcast.io/v1/properties"
+    url = f"{base}?postalCode={zipcode}&radius={radius}&limit={limit}"
 
     headers = {
         "accept": "application/json",
         "X-API-Key": API_KEY,
     }
     return url, headers
+
 
 def simplify_properties(raw: list[dict]) -> list[dict]:
     """
@@ -56,17 +68,17 @@ def simplify_properties(raw: list[dict]) -> list[dict]:
         })
     return simplified
 
-@app.get("/housing/{zipcode}")
 
+@app.get("/housing/{zipcode}")
 def get_housing_by_zip(
     zipcode: str,
-    limit: int= Query(10, ge=1, le=100, description= "Max number of properties to return (1-100)"),
-    raw: bool= Query( False, description="Return raw provider JSON if true, else simplified list"),
+    limit: int = Query(10, ge=1, le=100, description="Max number of properties to return (1-100)"),
+    raw: bool = Query(False, description="Return raw provider JSON if true, else simplified list"),
 ):
     if not API_KEY or API_KEY == "YOUR_API_KEY_HERE":
         raise HTTPException(status_code=500, detail="API key is not configured. Set RENTCAST_API_KEY in .env")
-    
-    url, headers= build_rentcast_url(zipcode, limit)
+
+    url, headers = build_rentcast_url(zipcode, limit)
 
     try:
         response = requests.get(url, headers=headers, timeout=15)
@@ -84,20 +96,14 @@ def get_housing_by_zip(
         data = response.json()
     except ValueError:
         raise HTTPException(status_code=502, detail="Provider returned invalid JSON.")
-    
+
     if not isinstance(data, list):
-        data= data.get("properties") if isinstance(data, dict) else []
+        data = data.get("properties") if isinstance(data, dict) else []
 
     return data if raw else simplify_properties(data)
-    
-from sklearn.ensemble import IsolationForest, RandomForestRegressor
-import pandas as pd
-import numpy as np
 
-from sklearn.ensemble import IsolationForest, RandomForestRegressor
-import pandas as pd
-import numpy as np
 
+# --- ANOMALY DETECTION ---
 @app.get("/anomalies/{zipcode}")
 def detect_anomalies_and_simulate_fix(
     zipcode: str,
@@ -106,31 +112,20 @@ def detect_anomalies_and_simulate_fix(
     """
     Detect homes that are missing features (e.g., fewer bathrooms than peers)
     and estimate what their price would be if upgraded to match area averages.
-    Combines data from the target ZIP and nearby ZIP codes for better model accuracy.
+    Uses RentCast's radius search for better data density.
     """
 
-    
-    try:
-        zip_int = int(zipcode)
-        nearby_zips = [str(zip_int + offset).zfill(5) for offset in range(-2, 3)]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid ZIP code format. Use numbers only.")
+    # Use RentCast's radius-based search (no need for ZIP ± offsets)
+    nearby_zips = [zipcode]  # keep for metadata
 
-    
-    combined_data = []
-    for z in nearby_zips:
-        try:
-            data = get_housing_by_zip(z, limit=limit, raw=False)
-            if data:
-                for item in data:
-                    item["source_zip"] = z  
-                combined_data.extend(data)
-        except Exception as e:
-            print(f"Warning: failed to fetch data for ZIP {z}: {e}")
+    # Fetch all homes within a 10-mile radius of the input ZIP
+    data = get_housing_by_zip(zipcode, limit=limit, raw=False)
+    combined_data = data if data else []
 
     if not combined_data:
-        raise HTTPException(status_code=404, detail="No housing data found for these ZIP codes.")
+        raise HTTPException(status_code=404, detail="No housing data found for this ZIP or nearby radius.")
 
+    # Clean and prepare numeric data
     df = pd.DataFrame(combined_data)
     numeric_cols = ["bedrooms", "bathrooms", "sqft", "price"]
     df = df[[col for col in numeric_cols if col in df.columns]].dropna()
@@ -138,7 +133,7 @@ def detect_anomalies_and_simulate_fix(
     if df.empty or len(df) < 10:
         raise HTTPException(status_code=400, detail="Not enough clean data to analyze anomalies.")
 
-    
+    # Train Random Forest regressor to model price
     X = df[["bedrooms", "bathrooms", "sqft"]]
     y = df["price"]
 
@@ -148,17 +143,18 @@ def detect_anomalies_and_simulate_fix(
     df["predicted_price"] = rf.predict(X)
     df["price_diff"] = df["price"] - df["predicted_price"]
 
+    # Detect anomalies using Isolation Forest
     features_for_anomaly = ["bedrooms", "bathrooms", "sqft", "price_diff"]
     iso = IsolationForest(contamination=0.1, random_state=42)
     df["anomaly_score"] = iso.fit_predict(df[features_for_anomaly])
     df["is_anomaly"] = df["anomaly_score"] == -1
 
+    # Compute average features for area
     avg_features = df[["bedrooms", "bathrooms", "sqft"]].mean().to_dict()
 
+    # Simulate upgrades for anomalous homes
     upgraded_records = []
     for _, row in df[df["is_anomaly"]].iterrows():
-        original = row.to_dict()
-
         added_features = {}
         adjusted_features = {
             "bedrooms": row["bedrooms"],
@@ -166,6 +162,7 @@ def detect_anomalies_and_simulate_fix(
             "sqft": row["sqft"]
         }
 
+        # Adjust only bedrooms/bathrooms below average
         for feature in ["bedrooms", "bathrooms"]:
             if row[feature] < avg_features[feature]:
                 diff = max(0, round(avg_features[feature] - row[feature]))
@@ -179,7 +176,7 @@ def detect_anomalies_and_simulate_fix(
         price_gain = new_price - row["price"]
 
         upgraded_records.append({
-            "source_zip": row.get("source_zip"),
+            "source_zip": zipcode,
             "original_features": {
                 "bedrooms": row["bedrooms"],
                 "bathrooms": row["bathrooms"],
