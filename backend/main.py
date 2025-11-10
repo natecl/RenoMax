@@ -142,5 +142,42 @@ def detect_anomalies_and_simulate_fix(
             "sqft": row["sqft"]
         }
 
-    
+        for feature in ["bedrooms", "bathrooms"]:
+            if row[feature]<avg_features[feature]:
+                diff=max(0, round(avg_features[feature]-row[feature]))
+                adjusted_features[feature]+=diff
+                added_features[feature]=diff
         
+        if not added_features:
+            continue
+        
+        new_price=rf.predict([[adjusted_features["bedrooms"], adjusted_features["bathrooms"], adjusted_features["sqft"]]])[0]
+        price_gain=new_price-row["price"]
+
+        upgraded_records.append({
+            "original_features": {
+                "bedrooms": row["bedrooms"],
+                "bathrooms": row["bathrooms"],
+                "sqft": row["sqft"],
+                "price": round(row["price"], 2),
+                "predicted_price": round(row["predicted_price"], 2),
+                "price_diff": round(row["price_diff"], 2)
+            },
+            "adjusted_features": {
+                "bedrooms": adjusted_features["bedrooms"],
+                "bathrooms": adjusted_features["bathrooms"],
+                "sqft": adjusted_features["sqft"],
+                "new_predicted_price": round(new_price, 2),
+                "estimated_value_increase": round(price_gain, 2)
+            },
+            "added_features": added_features
+        })
+
+    return {
+        "zipcode": zipcode,
+        "total_homes_analyzed": len(df),
+        "anomalies_found": len(upgraded_records),
+        "feature_importance": dict(zip(["bedrooms", "bathrooms", "sqft"], rf.feature_importances_.round(3).tolist())),
+        "upgraded_anomalous_homes": upgraded_records
+    }
+
