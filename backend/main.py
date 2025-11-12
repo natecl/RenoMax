@@ -7,12 +7,12 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import IsolationForest, RandomForestRegressor
 
-# Load environment variables (for your RAPIDAPI_KEY)
+# Load environment variables
 load_dotenv()
 
 app = FastAPI()
 
-# Allow CORS for frontend
+# Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,162 +23,155 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {"message": "Backend is running!"}
+    return {"message": "Backend is running with Zillow.com API (apimaker)!"}
 
 
-# ✅ Use RAPIDAPI key for Zillow
+# ✅ Zillow.com (apimaker) RapidAPI key
 API_KEY = os.getenv("RAPIDAPI_KEY", "YOUR_API_KEY_HERE")
 
-# ✅ Build Zillow API URL
+
 def build_zillow_url(zipcode: str, limit: int) -> tuple[str, dict]:
-    base = "https://zillow56.p.rapidapi.com/search"
-    url = f"{base}?location={zipcode}&limit={limit}"
+    """
+    Build Zillow.com (apimaker) API URL and headers.
+    Use /propertyExtendedSearch since it supports ZIPs.
+    """
+    base = "https://zillow-com1.p.rapidapi.com/propertyExtendedSearch"
+    url = f"{base}?location={zipcode}&status_type=ForSale&home_type=Houses&limit={limit}"
     headers = {
         "X-RapidAPI-Key": API_KEY,
-        "X-RapidAPI-Host": "zillow56.p.rapidapi.com",
+        "X-RapidAPI-Host": "zillow-com1.p.rapidapi.com",
     }
     return url, headers
 
 
-# ✅ Simplify Zillow property response into your clean schema
 def simplify_properties(raw: list[dict]) -> list[dict]:
+    """
+    Convert Zillow raw data into a clean and consistent shape for ML analysis.
+    Filters out incomplete or unrealistic records.
+    """
     simplified = []
     for item in raw:
         simplified.append({
             "address": item.get("address"),
-            "city": item.get("city"),
-            "state": item.get("state"),
-            "zipcode": item.get("zipcode"),
+            "city": item.get("city") or "Unknown",
+            "state": item.get("state") or "CA",
+            "zipcode": item.get("zipcode") or None,
             "bedrooms": item.get("bedrooms"),
             "bathrooms": item.get("bathrooms"),
-            "sqft": item.get("livingArea") or item.get("sqft"),
+            "sqft": item.get("livingArea") or item.get("area"),
             "price": item.get("price") or item.get("unformattedPrice") or item.get("zestimate"),
-            "listedDate": item.get("datePosted") or item.get("listedDate"),
             "lat": item.get("latitude"),
             "lng": item.get("longitude"),
             "externalId": item.get("zpid") or item.get("id"),
         })
-    return simplified
+    
+    # Filter out missing or unrealistic values
+    clean = [
+        p for p in simplified
+        if p["price"] and p["price"] > 50000
+        and p["bedrooms"] and p["bathrooms"]
+        and p["sqft"] and p["sqft"] > 300
+        and p["lat"] and p["lng"]
+    ]
+    return clean
 
 
-# ✅ Fetch Zillow housing data
-@app.get("/housing/{zipcode}")
-def get_housing_by_zip(
-    zipcode: str,
-    limit: int = Query(10, ge=1, le=100, description="Max number of properties to return (1–100)"),
-    raw: bool = Query(False, description="Return raw provider JSON if true, else simplified list"),
-):
-    if not API_KEY or API_KEY == "YOUR_API_KEY_HERE":
-        raise HTTPException(status_code=500, detail="API key is not configured. Set RAPIDAPI_KEY in .env")
-
-    # ✅ Call Zillow (not RentCast)
-    url, headers = build_zillow_url(zipcode, limit)
-
-    try:
-        response = requests.get(url, headers=headers, timeout=15)
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"Upstream request failed: {e!s}")
-
-    if response.status_code == 401:
-        raise HTTPException(status_code=502, detail="Provider rejected API key (401 Unauthorized).")
-    if response.status_code == 429:
-        raise HTTPException(status_code=502, detail="Rate limit exceeded by provider (429 Too Many Requests).")
-    if response.status_code >= 400:
-        raise HTTPException(status_code=502, detail=f"Provider error: HTTP {response.status_code}")
-
-    try:
-        data = response.json()
-    except ValueError:
-        raise HTTPException(status_code=502, detail="Provider returned invalid JSON.")
-
-    # ✅ Zillow’s API returns "results" instead of "properties"
-    if isinstance(data, dict) and "results" in data:
-        data = data["results"]
-
-    if not isinstance(data, list):
-        data = [data]
-
-    return data if raw else simplify_properties(data)
-
-
-# ✅ Anomaly detection endpoint
 @app.get("/anomalies/{zipcode}")
 def detect_anomalies_and_simulate_fix(
     zipcode: str,
-    limit: int = Query(50, ge=5, le=200, description="Number of properties to analyze")
+    limit: int = Query(50, ge=5, le=200)
 ):
+    """
+    Detect undervalued homes, calculate ROI, and categorize them
+    as 'good investment' or 'good renovation' opportunities.
+    """
     data = get_housing_by_zip(zipcode, limit=limit, raw=False)
 
     if not data:
-        raise HTTPException(status_code=404, detail="No housing data found for this ZIP code.")
-    
+        raise HTTPException(status_code=404, detail="No valid housing data found for this ZIP code.")
+
     df = pd.DataFrame(data)
     numeric_cols = ["bedrooms", "bathrooms", "sqft", "price"]
-    df = df[[col for col in numeric_cols if col in df.columns]].dropna()
+    df = df[numeric_cols].dropna()
 
     if df.empty or len(df) < 10:
         raise HTTPException(status_code=400, detail="Not enough clean data to analyze anomalies.")
 
+    # Train Random Forest model
     X = df[["bedrooms", "bathrooms", "sqft"]]
     y = df["price"]
-
     rf = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
     rf.fit(X, y)
 
     df["predicted_price"] = rf.predict(X)
     df["price_diff"] = df["price"] - df["predicted_price"]
 
-    features_for_anomaly = ["bedrooms", "bathrooms", "sqft", "price_diff"]
+    # Detect anomalies
     iso = IsolationForest(contamination=0.1, random_state=42)
-    df["anomaly_score"] = iso.fit_predict(df[features_for_anomaly])
-    df["is_anomaly"] = df["anomaly_score"] == -1
+    df["is_anomaly"] = iso.fit_predict(df[["bedrooms", "bathrooms", "sqft", "price_diff"]]) == -1
 
     avg_features = df[["bedrooms", "bathrooms", "sqft"]].mean().to_dict()
-
     upgraded_records = []
+
     for _, row in df[df["is_anomaly"]].iterrows():
         added_features = {}
-        adjusted_features = {
-            "bedrooms": row["bedrooms"],
-            "bathrooms": row["bathrooms"],
-            "sqft": row["sqft"]
-        }
+        adjusted = row.copy()
 
-        for feature in ["bedrooms", "bathrooms"]:
-            if row[feature] < avg_features[feature]:
-                diff = max(0, round(avg_features[feature] - row[feature]))
-                adjusted_features[feature] += diff
-                added_features[feature] = diff
+        # Simulate feature improvements
+        for f in ["bedrooms", "bathrooms"]:
+            if row[f] < avg_features[f]:
+                diff = max(0, round(avg_features[f] - row[f]))
+                adjusted[f] += diff
+                added_features[f] = diff
 
         if not added_features:
             continue
 
-        new_price = rf.predict([[adjusted_features["bedrooms"], adjusted_features["bathrooms"], adjusted_features["sqft"]]])[0]
+        # Predict new price after upgrades
+        new_price = rf.predict([[adjusted["bedrooms"], adjusted["bathrooms"], adjusted["sqft"]]])[0]
         price_gain = new_price - row["price"]
 
-        upgraded_records.append({
-            "original_features": {
-                "bedrooms": row["bedrooms"],
-                "bathrooms": row["bathrooms"],
-                "sqft": row["sqft"],
-                "price": round(row["price"], 2),
-                "predicted_price": round(row["predicted_price"], 2),
-                "price_diff": round(row["price_diff"], 2)
-            },
-            "adjusted_features": {
-                "bedrooms": adjusted_features["bedrooms"],
-                "bathrooms": adjusted_features["bathrooms"],
-                "sqft": adjusted_features["sqft"],
-                "new_predicted_price": round(new_price, 2),
-                "estimated_value_increase": round(price_gain, 2)
-            },
-            "added_features": added_features
-        })
+        if price_gain > 0:
+            potential_investment_score = round((price_gain / row["price"]) * 100, 2)
+
+            # Categorize home
+            if potential_investment_score >= 15:
+                category = "good_investment"
+            elif potential_investment_score >= 5:
+                category = "good_renovation"
+            else:
+                continue  # skip low ROI homes
+
+            upgraded_records.append({
+                "original": {
+                    "bedrooms": row["bedrooms"],
+                    "bathrooms": row["bathrooms"],
+                    "sqft": row["sqft"],
+                    "price": round(row["price"], 2),
+                    "predicted_price": round(row["predicted_price"], 2),
+                    "price_diff": round(row["price_diff"], 2),
+                },
+                "adjusted": {
+                    "bedrooms": adjusted["bedrooms"],
+                    "bathrooms": adjusted["bathrooms"],
+                    "sqft": adjusted["sqft"],
+                    "new_price": round(new_price, 2),
+                    "price_gain": round(price_gain, 2),
+                    "potential_investment_score": potential_investment_score,
+                    "category": category,
+                },
+                "added_features": added_features,
+            })
+
+    # Separate homes by category
+    good_investments = [h for h in upgraded_records if h["adjusted"]["category"] == "good_investment"]
+    good_renovations = [h for h in upgraded_records if h["adjusted"]["category"] == "good_renovation"]
 
     return {
         "zipcode": zipcode,
         "total_homes_analyzed": len(df),
-        "anomalies_found": len(upgraded_records),
+        "undervalued_homes_found": len(upgraded_records),
         "feature_importance": dict(zip(["bedrooms", "bathrooms", "sqft"], rf.feature_importances_.round(3).tolist())),
-        "upgraded_anomalous_homes": upgraded_records
+        "good_investments": good_investments,
+        "good_renovations": good_renovations,
     }
