@@ -76,6 +76,60 @@ def simplify_properties(raw: list[dict]) -> list[dict]:
     return clean
 
 
+@app.get("/housing/{zipcode}")
+def get_housing_by_zip(
+    zipcode: str,
+    limit: int = Query(20, ge=1, le=100),
+    raw: bool = Query(False)
+):
+    """
+    Fetch Zillow data for a ZIP code using apimaker's Zillow.com API.
+    If too few homes are returned, automatically try nearby ZIPs.
+    """
+    if not API_KEY or API_KEY == "YOUR_API_KEY_HERE":
+        raise HTTPException(status_code=500, detail="RAPIDAPI_KEY not configured in .env")
+
+    # Helper function to fetch a single ZIP
+    def fetch_zip(zipcode: str):
+        url, headers = build_zillow_url(zipcode, limit)
+        try:
+            response = requests.get(url, headers=headers, timeout=20)
+            if response.status_code != 200:
+                return []
+            data = response.json()
+            if isinstance(data, dict):
+                data = data.get("props", data.get("properties", []))
+            return simplify_properties(data)
+        except Exception:
+            return []
+
+    # Start with the main ZIP
+    all_props = fetch_zip(zipcode)
+
+    # If not enough, expand to neighboring ZIPs (±1 and ±2)
+    if len(all_props) < 10:
+        try:
+            zip_int = int(zipcode)
+            neighbors = [str(zip_int - 2), str(zip_int - 1), str(zip_int + 1), str(zip_int + 2)]
+            for z in neighbors:
+                all_props.extend(fetch_zip(z))
+        except ValueError:
+            pass  # ignore if ZIP isn't numeric
+
+    # Deduplicate by address
+    seen = set()
+    unique_props = []
+    for p in all_props:
+        if p["address"] not in seen:
+            seen.add(p["address"])
+            unique_props.append(p)
+
+    if not unique_props:
+        raise HTTPException(status_code=404, detail=f"No valid housing data found near ZIP {zipcode}.")
+
+    return unique_props if raw else unique_props
+
+
 @app.get("/anomalies/{zipcode}")
 def detect_anomalies_and_simulate_fix(
     zipcode: str,
