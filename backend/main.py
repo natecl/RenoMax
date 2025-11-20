@@ -19,8 +19,8 @@ load_dotenv()
 
 app = FastAPI()
 
-app.mount(app.mount("/static", StaticFiles(directory="../frontend/build/static"), name="static")
-)
+app.mount("/static", StaticFiles(directory="../frontend/build/static"), name="static")
+
 # Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
