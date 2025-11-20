@@ -19,7 +19,8 @@ load_dotenv()
 
 app = FastAPI()
 
-app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")
+app.mount(app.mount("/static", StaticFiles(directory="../frontend/build/static"), name="static")
+)
 # Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
@@ -32,7 +33,7 @@ app.add_middleware(
 # SERVE REACT FRONTEND
 @app.get("/{full_path:path}")
 def serve_react_app(full_path: str):
-    index_path = os.path.join("frontend", "build", "index.html")
+    index_path =os.path.join("..", "frontend", "build", "index.html")
     return FileResponse(index_path)
 
 # ✅ Zillow.com (apimaker) RapidAPI key
@@ -240,3 +241,6 @@ def detect_anomalies_and_simulate_fix(
     }
 
 
+@app.get("/{full_path:path}")
+def react_router(full_path: str):
+    return FileResponse(os.path.join("..", "frontend", "build", "index.html"))
