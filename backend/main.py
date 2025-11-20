@@ -6,12 +6,20 @@ from dotenv import load_dotenv
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import IsolationForest, RandomForestRegressor
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
+
+
+
+
 
 # Load environment variables
 load_dotenv()
 
 app = FastAPI()
 
+app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")
 # Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
@@ -21,10 +29,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-def root():
-    return {"message": "Backend is running with Zillow.com API (apimaker)!"}
-
+# SERVE REACT FRONTEND
+@app.get("/{full_path:path}")
+def serve_react_app(full_path: str):
+    index_path = os.path.join("frontend", "build", "index.html")
+    return FileResponse(index_path)
 
 # ✅ Zillow.com (apimaker) RapidAPI key
 API_KEY = os.getenv("RAPIDAPI_KEY", "YOUR_API_KEY_HERE")
@@ -229,3 +238,5 @@ def detect_anomalies_and_simulate_fix(
         "good_investments": good_investments,
         "good_renovations": good_renovations,
     }
+
+
