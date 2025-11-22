@@ -204,3 +204,4 @@ def serve_react_root():
 @app.get("/{full_path:path}")
 def react_fallback(full_path: str):
     return FileResponse("../frontend/build/index.html")
+
