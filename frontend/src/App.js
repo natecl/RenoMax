@@ -145,50 +145,27 @@ function App() {
 
           <div className="space-y-6 lg:col-span-2">
             {homes.length === 0 && (
-              <div className="bg-white/70 border border-slate-100 rounded-2xl p-8 shadow-lg backdrop-blur">
-                <h3 className="text-xl font-semibold text-slate-900">
-                  Start with a ZIP search
-                </h3>
-                <p className="text-slate-600 mt-2">
-                  We’ll pull listings nearby and show quick stats. Then, dial it in with filters to find your best options.
-                </p>
-                <div className="hidden md:flex justify-end items-end mt-6 w-full">
+              <div className="space-y-4">
+                <div className="bg-white/70 border border-slate-100 rounded-2xl p-8 shadow-lg backdrop-blur">
+                  <h3 className="text-xl font-semibold text-slate-900">
+                    Start with a ZIP search
+                  </h3>
+                  <p className="text-slate-600 mt-2">
+                    We’ll pull listings nearby and show quick stats. Then, dial it in with filters to find your best options.
+                  </p>
+                </div>
+                <div className="hidden md:flex justify-end items-end mt-4">
                   <button
                     type="button"
-                    className="relative inline-flex items-center gap-4 px-5 py-4 w-full max-w-[22rem] rounded-2xl border border-blue-200 bg-white/95 shadow-lg shadow-blue-200/70 ring-1 ring-blue-100/70 hover:-translate-y-0.5 transition-transform"
+                    aria-label="Blueprint preview"
+                    className="relative inline-flex w-full max-w-[46rem] h-[268px] rounded-2xl bg-gradient-to-br from-[#0a3a91] via-[#0b3f9c] to-[#0c4fb3] shadow-lg shadow-blue-200/70 overflow-hidden hover:-translate-y-0.5 transition-transform"
                   >
-                    <div className="relative h-20 w-32 rounded-xl overflow-hidden border border-blue-200 bg-gradient-to-br from-[#0a3a91] via-[#0b3f9c] to-[#0c4fb3]">
-                      <div
-                        className="absolute inset-0 opacity-40"
-                        style={{
-                          backgroundImage:
-                            "linear-gradient(transparent, transparent), radial-gradient(circle at 1px 1px, rgba(191,219,254,0.4) 1px, transparent 0px)",
-                          backgroundSize: "22px 22px, 26px 26px",
-                        }}
-                      />
-                      <svg
-                        viewBox="0 0 190 120"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="absolute inset-2 text-blue-50"
-                        stroke="currentColor"
-                        strokeWidth="2.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M24 92V58L95 22L166 58V92H24Z" />
-                        <path d="M64 92V70H94V92" />
-                        <path d="M114 92V72H146V92" />
-                        <path d="M95 22V52" />
-                        <path d="M50 72H144" strokeDasharray="9 8" />
-                        <path d="M69 40L95 26L121 40" />
-                        <path d="M38 82H152" opacity="0.7" />
-                      </svg>
-                    </div>
-                    <div className="text-left text-sm leading-tight">
-                      <p className="font-semibold text-slate-900">Blueprint</p>
-                      <p className="text-slate-500 text-xs">Modern renovation concept</p>
-                    </div>
+                    <div
+                      className="absolute inset-0 bg-cover bg-center"
+                      style={{
+                        backgroundImage: "url('/uploaded-blueprint.png')",
+                      }}
+                    />
                   </button>
                 </div>
               </div>
