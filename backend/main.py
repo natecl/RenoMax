@@ -118,7 +118,95 @@ def get_housing(zipcode: str, limit: int = Query(20)):
     if not unique:
         raise HTTPException(404, f"No homes found near {zipcode}")
 
-    return unique
+    return enrich_with_models(unique)
+
+
+def enrich_with_models(homes):
+    """
+    Adds anomaly flags (Isolation Forest) and a simple renovation uplift estimate
+    using a RandomForest regressor trained on the fetched homes.
+    """
+    df = pd.DataFrame(homes)
+    if df.empty:
+        return homes
+
+    # Ensure numeric columns
+    for col in ["bedrooms", "bathrooms", "sqft", "price"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    usable = df.dropna(subset=["bedrooms", "bathrooms", "sqft", "price"])
+
+    # Isolation Forest for anomalies (low-feature / underpriced outliers)
+    df["anomaly"] = False
+    df["anomalyScore"] = None
+    if len(usable) >= 8:
+        iso = IsolationForest(
+            contamination=0.12,
+            random_state=42,
+            n_estimators=200,
+        )
+        features = usable[["bedrooms", "bathrooms", "sqft", "price"]]
+        preds = iso.fit_predict(features)
+        scores = iso.decision_function(features)
+        for idx, pred, score in zip(usable.index, preds, scores):
+            if pred == -1:
+                df.loc[idx, "anomaly"] = True
+            df.loc[idx, "anomalyScore"] = float(score)
+
+    # Train a small regressor to estimate renovation uplift
+    df["renovation"] = None
+    if len(usable) >= 6:
+        X = usable[["bedrooms", "bathrooms", "sqft"]]
+        y = usable["price"]
+        model = RandomForestRegressor(
+            n_estimators=300,
+            random_state=42,
+            n_jobs=-1,
+            max_depth=12,
+        )
+        model.fit(X, y)
+    else:
+        model = None
+
+    median_beds = usable["bedrooms"].median() if not usable.empty else None
+    median_baths = usable["bathrooms"].median() if not usable.empty else None
+
+    for idx, row in df.iterrows():
+        beds = row["bedrooms"]
+        baths = row["bathrooms"]
+        sqft = row["sqft"]
+        price = row["price"]
+
+        if any(pd.isna([beds, baths, sqft, price])):
+            continue
+
+        add_bed = 1 if median_beds and beds < median_beds else 0
+        add_bath = 1 if median_baths and baths < median_baths else 0
+
+        # Only suggest a renovation if the home is missing at least one common feature
+        if add_bed == 0 and add_bath == 0:
+            continue
+
+        added_sqft = 220 * add_bed + 140 * add_bath
+        target_features = [[beds + add_bed, baths + add_bath, sqft + added_sqft]]
+
+        if model:
+            predicted_new = float(model.predict(target_features)[0])
+        else:
+            predicted_new = float(price * 1.08)  # conservative uplift fallback
+
+        uplift = predicted_new - price
+        df.at[idx, "renovation"] = {
+            "addBedrooms": add_bed,
+            "addBathrooms": add_bath,
+            "addedSqft": added_sqft,
+            "predictedNewPrice": round(predicted_new),
+            "estimatedUplift": round(uplift),
+        }
+
+    # Preserve original ordering and convert back to dicts
+    enriched = df.to_dict(orient="records")
+    return enriched
 
 
 # ---------------------------------------------------------

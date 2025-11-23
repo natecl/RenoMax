@@ -5,6 +5,7 @@ import FilterBar from "./FilterBar";
 function App() {
   const [homes, setHomes] = useState([]);
   const [filteredHomes, setFilteredHomes] = useState([]);
+  const [anomaliesOnly, setAnomaliesOnly] = useState(false);
   const [filters, setFilters] = useState({
     beds: "",
     baths: "",
@@ -12,22 +13,34 @@ function App() {
     maxPrice: "",
   });
 
+  const sortHomes = (list) =>
+    [...list].sort((a, b) => {
+      if (a.anomaly === b.anomaly) return (b.price || 0) - (a.price || 0);
+      return b.anomaly ? 1 : -1;
+    });
+
+  const computeFiltered = (base, currentFilters, anomalyOnlyFlag) => {
+    let list = [...base];
+
+    if (currentFilters.beds)
+      list = list.filter((h) => h.bedrooms >= Number(currentFilters.beds));
+
+    if (currentFilters.baths)
+      list = list.filter((h) => h.bathrooms >= Number(currentFilters.baths));
+
+    if (currentFilters.minPrice)
+      list = list.filter((h) => h.price >= Number(currentFilters.minPrice));
+
+    if (currentFilters.maxPrice)
+      list = list.filter((h) => h.price <= Number(currentFilters.maxPrice));
+
+    if (anomalyOnlyFlag) list = list.filter((h) => h.anomaly);
+
+    return sortHomes(list);
+  };
+
   const applyFilters = () => {
-    let list = [...homes];
-
-    if (filters.beds)
-      list = list.filter((h) => h.bedrooms >= Number(filters.beds));
-
-    if (filters.baths)
-      list = list.filter((h) => h.bathrooms >= Number(filters.baths));
-
-    if (filters.minPrice)
-      list = list.filter((h) => h.price >= Number(filters.minPrice));
-
-    if (filters.maxPrice)
-      list = list.filter((h) => h.price <= Number(filters.maxPrice));
-
-    setFilteredHomes(list);
+    setFilteredHomes(computeFiltered(homes, filters, anomaliesOnly));
   };
 
   const priceValues = filteredHomes
@@ -35,39 +48,72 @@ function App() {
     .filter((p) => typeof p === "number");
   const minPrice = priceValues.length ? Math.min(...priceValues) : null;
   const maxPrice = priceValues.length ? Math.max(...priceValues) : null;
+  const avgPrice = priceValues.length
+    ? Math.round(priceValues.reduce((a, b) => a + b, 0) / priceValues.length)
+    : null;
+  const sqftValues = filteredHomes
+    .map((h) => h.sqft)
+    .filter((s) => typeof s === "number");
+  const avgSqft = sqftValues.length
+    ? Math.round(sqftValues.reduce((a, b) => a + b, 0) / sqftValues.length)
+    : null;
   const formatCurrency = (value) =>
     typeof value === "number" ? `$${value.toLocaleString()}` : "—";
   const hasResults = filteredHomes.length > 0;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-6 py-12 space-y-10">
-        <header className="space-y-3">
-          <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-semibold uppercase tracking-wide">
-            RenovMax
-          </span>
-          <div className="space-y-2">
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-900">
-              Find the right home and plan your renovation
-            </h1>
-            <p className="text-slate-600 max-w-3xl">
-              Search by ZIP, then refine by beds, baths, and budget. We surface nearby listings so you can spot opportunities quickly.
-            </p>
+    <div className="min-h-screen bg-slate-50 relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(79,70,229,0.10),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(59,130,246,0.12),transparent_22%)]" />
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-10 space-y-10">
+        <header className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold shadow-lg">
+              R
+            </div>
+            <div>
+              <p className="text-sm uppercase tracking-wide text-slate-500 font-semibold">
+                RenovMax
+              </p>
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-900">
+                Find the right home. Plan the smart renovation.
+              </h1>
+            </div>
           </div>
+          <button
+            onClick={() => {
+              const next = !anomaliesOnly;
+              setAnomaliesOnly(next);
+              setFilteredHomes(computeFiltered(homes, filters, next));
+            }}
+            className={`hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold shadow-lg shadow-slate-900/10 hover:-translate-y-0.5 transition ${
+              anomaliesOnly
+                ? "bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 text-white"
+                : "bg-slate-900 text-white"
+            }`}
+          >
+            {anomaliesOnly ? "Show all homes" : "Show anomalies only"}
+          </button>
         </header>
 
         <div className="grid lg:grid-cols-3 gap-6 items-start">
-          <div className="space-y-6 lg:col-span-1">
+          <div className="space-y-4 lg:col-span-1">
             <ZipSearch
               onResults={(data) => {
+                const ordered = sortHomes(data);
                 setFilters({
                   beds: "",
                   baths: "",
                   minPrice: "",
                   maxPrice: "",
                 });
-                setHomes(data);
-                setFilteredHomes(data);
+                setAnomaliesOnly(false);
+                setHomes(ordered);
+                setFilteredHomes(computeFiltered(ordered, {
+                  beds: "",
+                  baths: "",
+                  minPrice: "",
+                  maxPrice: "",
+                }, false));
               }}
             />
 
@@ -76,14 +122,30 @@ function App() {
                 filters={filters}
                 setFilters={setFilters}
                 applyFilters={applyFilters}
-                onClear={() => setFilteredHomes(homes)}
+                onClear={() =>
+                  setFilteredHomes(
+                    computeFiltered(
+                      homes,
+                      { beds: "", baths: "", minPrice: "", maxPrice: "" },
+                      anomaliesOnly
+                    )
+                  )
+                }
               />
             )}
+
+            <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl p-5 shadow-lg">
+              <p className="text-sm text-slate-200">Renovation potential</p>
+              <h3 className="text-lg font-semibold mt-1">Spot undervalued homes</h3>
+              <p className="text-slate-300 text-sm mt-2">
+                Compare price per square foot and bedroom counts to find the best candidates for upgrades.
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-4 lg:col-span-2">
+          <div className="space-y-6 lg:col-span-2">
             {homes.length === 0 && (
-              <div className="bg-white/70 border border-slate-100 rounded-2xl p-8 shadow-sm">
+              <div className="bg-white/70 border border-slate-100 rounded-2xl p-8 shadow-lg backdrop-blur">
                 <h3 className="text-xl font-semibold text-slate-900">
                   Start with a ZIP search
                 </h3>
@@ -93,80 +155,123 @@ function App() {
               </div>
             )}
 
-            {homes.length > 0 && (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-sm uppercase tracking-wide text-slate-500 font-semibold">
-                    Current Results
-                  </p>
-                  <h2 className="text-2xl font-bold text-slate-900">
-                    {filteredHomes.length} home{filteredHomes.length === 1 ? "" : "s"} in view
-                  </h2>
-                </div>
-                {hasResults && (
-                  <div className="flex items-center gap-4 text-sm text-slate-600">
-                    <div>
+            {hasResults && (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-sm uppercase tracking-wide text-slate-500 font-semibold">
+                      Current Results
+                    </p>
+                    <h2 className="text-2xl font-bold text-slate-900">
+                      {filteredHomes.length} home{filteredHomes.length === 1 ? "" : "s"} in view
+                    </h2>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-slate-600">
+                    <div className="bg-white/80 border border-slate-100 px-4 py-3 rounded-2xl shadow-sm">
                       <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Price range</p>
                       <p className="font-semibold text-slate-900">
                         {formatCurrency(minPrice)} – {formatCurrency(maxPrice)}
                       </p>
                     </div>
-                    <div className="h-10 w-px bg-slate-200" />
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Total fetched</p>
-                      <p className="font-semibold text-slate-900">{homes.length}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {hasResults && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {filteredHomes.map((home) => (
-                  <div
-                    key={home.externalId}
-                    className="group bg-white/90 border border-slate-100 rounded-2xl shadow-sm hover:shadow-xl transition hover:-translate-y-1"
-                  >
-                    <div className="h-1 rounded-t-2xl bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-500" />
-                    <div className="p-5 space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm text-slate-500 uppercase tracking-wide font-semibold">
-                            {home.city}, {home.state}
-                          </p>
-                          <h2 className="text-xl font-semibold text-slate-900">
-                            {home.address}
-                          </h2>
-                        </div>
-                        <span className="text-xs font-semibold px-3 py-1 rounded-full bg-blue-50 text-blue-700">
-                          For Sale
-                        </span>
-                      </div>
-                      <p className="text-2xl font-bold text-slate-900">
-                        ${home.price.toLocaleString()}
+                    <div className="bg-white/80 border border-slate-100 px-4 py-3 rounded-2xl shadow-sm">
+                      <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Avg price</p>
+                      <p className="font-semibold text-slate-900">
+                        {formatCurrency(avgPrice)}
                       </p>
-                      <div className="flex items-center gap-4 text-slate-600 text-sm">
-                        <span className="inline-flex items-center gap-1">
-                          🛏️ {home.bedrooms} Beds
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          🛁 {home.bathrooms} Baths
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          📐 {home.sqft} Sqft
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm text-slate-500 pt-2">
-                        <span>ZIP {home.zipcode || "—"}</span>
-                        <span className="font-medium text-blue-700 group-hover:text-blue-800">
-                          View details
-                        </span>
-                      </div>
+                    </div>
+                    <div className="bg-white/80 border border-slate-100 px-4 py-3 rounded-2xl shadow-sm">
+                      <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Avg size</p>
+                      <p className="font-semibold text-slate-900">
+                        {avgSqft ? `${avgSqft.toLocaleString()} sqft` : "—"}
+                      </p>
+                    </div>
+                    <div className="bg-indigo-50 border border-indigo-100 px-4 py-3 rounded-2xl shadow-sm text-indigo-800">
+                      <p className="text-xs uppercase tracking-wide font-semibold">Anomalies</p>
+                      <p className="font-semibold">
+                        {filteredHomes.filter((h) => h.anomaly).length} flagged
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {filteredHomes.map((home) => {
+                    const pricePerSqft =
+                      home.price && home.sqft ? Math.round(home.price / home.sqft) : null;
+                    return (
+                      <div
+                        key={home.externalId}
+                        className="group bg-white/90 border border-slate-100 rounded-2xl shadow-lg hover:shadow-2xl transition hover:-translate-y-1 backdrop-blur"
+                      >
+                        <div className="h-1 rounded-t-2xl bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-500" />
+                        <div className="p-5 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                {home.city}, {home.state}
+                              </p>
+                              <h2 className="text-lg font-semibold text-slate-900">
+                                {home.address}
+                              </h2>
+                            </div>
+                            <div className="flex flex-col gap-1 items-end">
+                              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-blue-50 text-blue-700">
+                                For Sale
+                              </span>
+                              {home.anomaly && (
+                                <span className="text-[11px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-800">
+                                  Anomaly
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-2xl font-bold text-slate-900">
+                            ${home.price.toLocaleString()}
+                          </p>
+                          <div className="flex items-center gap-4 text-slate-700 text-sm">
+                            <span className="inline-flex items-center gap-1">
+                              🛏️ {home.bedrooms} Beds
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                              🛁 {home.bathrooms} Baths
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                              📐 {home.sqft} Sqft
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm text-slate-500 pt-2">
+                            <span>ZIP {home.zipcode || "—"}</span>
+                            <span className="font-medium text-blue-700 group-hover:text-blue-800">
+                              {pricePerSqft ? `$${pricePerSqft}/sqft` : "Details"}
+                            </span>
+                          </div>
+                          {home.renovation && (
+                            <div className="mt-3 rounded-xl bg-slate-50 border border-slate-100 p-3">
+                              <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold mb-1">
+                                Renovation uplift
+                              </p>
+                              <div className="flex items-center justify-between">
+                                <div className="text-sm text-slate-700">
+                                  +{home.renovation.addBedrooms} bed / +{home.renovation.addBathrooms} bath · +{home.renovation.addedSqft} sqft
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm text-slate-500">Projected</p>
+                                  <p className="text-lg font-semibold text-green-700">
+                                    ${home.renovation.predictedNewPrice.toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <p className="text-xs text-green-700 font-semibold mt-1">
+                                +${home.renovation.estimatedUplift.toLocaleString()} uplift
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
 
             {homes.length > 0 && filteredHomes.length === 0 && (

@@ -4,6 +4,7 @@ function ZipSearch({ onResults }) {
   const [zip, setZip] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const quickZips = ["94107", "10001", "30309", "78704"];
 
   const handleSearch = async () => {
     if (!zip || zip.length !== 5) {
@@ -56,8 +57,23 @@ function ZipSearch({ onResults }) {
           disabled={loading}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
         >
-          {loading ? "Searching..." : "Search"}
+          {loading ? "Searching..." : "Search homes"}
         </button>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-3">
+        {quickZips.map((z) => (
+          <button
+            key={z}
+            onClick={() => {
+              setZip(z);
+              handleSearch();
+            }}
+            className="px-3 py-1 rounded-full border border-slate-200 text-slate-700 text-sm hover:border-blue-400 hover:text-blue-700 transition"
+          >
+            {z}
+          </button>
+        ))}
       </div>
 
       <p className="text-xs text-slate-500 mb-2">
