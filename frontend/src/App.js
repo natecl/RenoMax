@@ -64,31 +64,6 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(79,70,229,0.10),transparent_25%),radial-gradient(circle_at_80%_0%,rgba(59,130,246,0.12),transparent_22%)]" />
-      <div className="pointer-events-none absolute bottom-6 right-6 w-64 h-48 md:w-80 md:h-60 opacity-70">
-        <svg viewBox="0 0 320 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="grid" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-              <path d="M20 0H0V20" stroke="#5CA4FF" strokeWidth="0.5" />
-            </pattern>
-          </defs>
-          <rect width="320" height="240" fill="url(#grid)" />
-          <rect x="0.5" y="0.5" width="319" height="239" stroke="#4F90F8" strokeWidth="1" />
-          <path
-            d="M80 180V120L160 70L240 120V180H80Z"
-            stroke="#8BC8FF"
-            strokeWidth="4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path d="M115 180V140H145V180" stroke="#8BC8FF" strokeWidth="3" />
-          <path d="M175 180V150H210V180" stroke="#8BC8FF" strokeWidth="3" />
-          <path d="M160 70V110" stroke="#8BC8FF" strokeWidth="3" />
-          <path d="M80 147H240" stroke="#4F90F8" strokeWidth="2" strokeDasharray="8 6" />
-          <circle cx="100" cy="200" r="6" fill="#2563EB" opacity="0.7" />
-          <circle cx="220" cy="200" r="6" fill="#2563EB" opacity="0.7" />
-          <path d="M100 200H220" stroke="#2563EB" strokeWidth="2" strokeDasharray="4 5" />
-        </svg>
-      </div>
       <div className="relative z-10 max-w-6xl mx-auto px-6 py-10 space-y-10">
         <header className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -309,6 +284,19 @@ function App() {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <div className="inline-flex items-center gap-3 px-4 py-3 rounded-2xl border border-blue-100 bg-white/90 shadow-lg shadow-blue-100/60">
+            <img
+              src="https://images.unsplash.com/photo-1503389152951-9f343605f61e?auto=format&fit=crop&w=400&q=80"
+              alt="Modern house blueprint sketch"
+              className="h-16 w-20 object-cover rounded-xl border border-blue-200"
+            />
+            <div className="text-sm leading-tight">
+              <p className="font-semibold text-slate-900">Reno blueprint</p>
+              <p className="text-slate-500 text-xs">Modern 3D remodel concept</p>
+            </div>
           </div>
         </div>
       </div>
