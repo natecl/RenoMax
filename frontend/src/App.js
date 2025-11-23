@@ -152,37 +152,44 @@ function App() {
                 <p className="text-slate-600 mt-2">
                   We’ll pull listings nearby and show quick stats. Then, dial it in with filters to find your best options.
                 </p>
-                <div className="hidden md:block mt-6">
-                  <div className="relative h-[240px] lg:h-[320px] rounded-3xl overflow-hidden border border-blue-200/70 shadow-2xl shadow-blue-200/50 bg-gradient-to-br from-[#0e3f9c] via-[#0b367f] to-[#0a2f6d]">
-                    <div
-                      className="absolute inset-0 opacity-30"
-                      style={{
-                        backgroundImage:
-                          "linear-gradient(transparent, transparent), radial-gradient(circle at 1px 1px, rgba(147,197,253,0.35) 1px, transparent 0px)",
-                        backgroundSize: "24px 24px, 28px 28px",
-                      }}
-                    />
-                    <svg
-                      viewBox="0 0 320 220"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="absolute inset-6 text-blue-100/80"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M45 164V118L160 62L275 118V164H45Z" />
-                      <path d="M120 164V126H156V164" />
-                      <path d="M184 164V134H224V164" />
-                      <path d="M160 62V102" />
-                      <path d="M96 138H224" strokeDasharray="10 8" />
-                      <path d="M140 86L160 74L180 86" />
-                      <path d="M108 118L160 90L212 118" />
-                      <path d="M45 146H275" opacity="0.7" />
-                    </svg>
-                    <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/30 via-transparent to-blue-400/10" />
-                  </div>
+                <div className="hidden md:flex justify-end items-end mt-6 w-full">
+                  <button
+                    type="button"
+                    className="relative inline-flex items-center gap-4 px-5 py-4 w-full max-w-[22rem] rounded-2xl border border-blue-200 bg-white/95 shadow-lg shadow-blue-200/70 ring-1 ring-blue-100/70 hover:-translate-y-0.5 transition-transform"
+                  >
+                    <div className="relative h-20 w-32 rounded-xl overflow-hidden border border-blue-200 bg-gradient-to-br from-[#0a3a91] via-[#0b3f9c] to-[#0c4fb3]">
+                      <div
+                        className="absolute inset-0 opacity-40"
+                        style={{
+                          backgroundImage:
+                            "linear-gradient(transparent, transparent), radial-gradient(circle at 1px 1px, rgba(191,219,254,0.4) 1px, transparent 0px)",
+                          backgroundSize: "22px 22px, 26px 26px",
+                        }}
+                      />
+                      <svg
+                        viewBox="0 0 190 120"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="absolute inset-2 text-blue-50"
+                        stroke="currentColor"
+                        strokeWidth="2.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M24 92V58L95 22L166 58V92H24Z" />
+                        <path d="M64 92V70H94V92" />
+                        <path d="M114 92V72H146V92" />
+                        <path d="M95 22V52" />
+                        <path d="M50 72H144" strokeDasharray="9 8" />
+                        <path d="M69 40L95 26L121 40" />
+                        <path d="M38 82H152" opacity="0.7" />
+                      </svg>
+                    </div>
+                    <div className="text-left text-sm leading-tight">
+                      <p className="font-semibold text-slate-900">Blueprint</p>
+                      <p className="text-slate-500 text-xs">Modern renovation concept</p>
+                    </div>
+                  </button>
                 </div>
               </div>
             )}
