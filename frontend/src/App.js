@@ -152,6 +152,38 @@ function App() {
                 <p className="text-slate-600 mt-2">
                   We’ll pull listings nearby and show quick stats. Then, dial it in with filters to find your best options.
                 </p>
+                <div className="hidden md:block mt-6">
+                  <div className="relative h-[240px] lg:h-[320px] rounded-3xl overflow-hidden border border-blue-200/70 shadow-2xl shadow-blue-200/50 bg-gradient-to-br from-[#0e3f9c] via-[#0b367f] to-[#0a2f6d]">
+                    <div
+                      className="absolute inset-0 opacity-30"
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(transparent, transparent), radial-gradient(circle at 1px 1px, rgba(147,197,253,0.35) 1px, transparent 0px)",
+                        backgroundSize: "24px 24px, 28px 28px",
+                      }}
+                    />
+                    <svg
+                      viewBox="0 0 320 220"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="absolute inset-6 text-blue-100/80"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M45 164V118L160 62L275 118V164H45Z" />
+                      <path d="M120 164V126H156V164" />
+                      <path d="M184 164V134H224V164" />
+                      <path d="M160 62V102" />
+                      <path d="M96 138H224" strokeDasharray="10 8" />
+                      <path d="M140 86L160 74L180 86" />
+                      <path d="M108 118L160 90L212 118" />
+                      <path d="M45 146H275" opacity="0.7" />
+                    </svg>
+                    <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/30 via-transparent to-blue-400/10" />
+                  </div>
+                </div>
               </div>
             )}
 
@@ -284,19 +316,6 @@ function App() {
                 </p>
               </div>
             )}
-          </div>
-        </div>
-        <div className="flex justify-end">
-          <div className="inline-flex items-center gap-3 px-4 py-3 rounded-2xl border border-blue-100 bg-white/90 shadow-lg shadow-blue-100/60">
-            <img
-              src="https://images.unsplash.com/photo-1503389152951-9f343605f61e?auto=format&fit=crop&w=400&q=80"
-              alt="Modern house blueprint sketch"
-              className="h-16 w-20 object-cover rounded-xl border border-blue-200"
-            />
-            <div className="text-sm leading-tight">
-              <p className="font-semibold text-slate-900">Reno blueprint</p>
-              <p className="text-slate-500 text-xs">Modern 3D remodel concept</p>
-            </div>
           </div>
         </div>
       </div>
