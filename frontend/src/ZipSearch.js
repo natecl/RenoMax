@@ -16,7 +16,10 @@ function ZipSearch({ onResults }) {
     setLoading(true);
 
     try {
-      const res = await fetch(`https://your-api.onrender.com/housing/${zip}`);
+      const API_URL = "https://YOUR-BACKEND-NAME.onrender.com";
+
+      const res = await fetch(`${API_URL}/housing/${zip}`);
+
       if (!res.ok) throw new Error("API error");
 
       const data = await res.json();

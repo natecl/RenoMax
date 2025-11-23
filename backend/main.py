@@ -10,22 +10,20 @@ load_dotenv()
 
 app = FastAPI()
 
-# Allow frontend to call backend
+# CORS so frontend can call backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # or put your Render frontend URL here
+    allow_origins=["*"],  # You can paste your frontend Render URL here later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-API_KEY = os.getenv("RAPIDAPI_KEY", "YOUR_API_KEY_HERE")
-
+API_KEY = os.getenv("RAPIDAPI_KEY", "")
 
 def build_zillow_url(zipcode: str, limit: int):
     base = "https://zillow-com1.p.rapidapi.com/propertyExtendedSearch"
     url = f"{base}?location={zipcode}&status_type=ForSale&home_type=Houses&limit={limit}"
-
     headers = {
         "X-RapidAPI-Key": API_KEY,
         "X-RapidAPI-Host": "zillow-com1.p.rapidapi.com",
@@ -62,13 +60,13 @@ def simplify_properties(raw):
 
 @app.get("/housing/{zipcode}")
 def get_housing_by_zip(zipcode: str, limit: int = Query(20, ge=1, le=100)):
-    if not API_KEY or API_KEY == "YOUR_API_KEY_HERE":
-        raise HTTPException(status_code=500, detail="RAPIDAPI_KEY not set.")
+    if not API_KEY:
+        raise HTTPException(status_code=500, detail="RAPIDAPI_KEY is not configured on Render.")
 
     def fetch_zip(z):
         url, headers = build_zillow_url(z, limit)
         try:
-            r = requests.get(url, headers=headers, timeout=20)
+            r = requests.get(url, headers=headers, timeout=15)
             if r.status_code != 200:
                 return []
             data = r.json()
@@ -80,12 +78,12 @@ def get_housing_by_zip(zipcode: str, limit: int = Query(20, ge=1, le=100)):
 
     props = fetch_zip(zipcode)
 
+    # Extend to neighbor ZIPs if needed
     if len(props) < 10:
         try:
             z = int(zipcode)
-            neighbors = [str(z - 1), str(z + 1)]
-            for n in neighbors:
-                props.extend(fetch_zip(n))
+            for n in [z-1, z+1]:
+                props.extend(fetch_zip(str(n)))
         except:
             pass
 
@@ -97,6 +95,6 @@ def get_housing_by_zip(zipcode: str, limit: int = Query(20, ge=1, le=100)):
             unique.append(p)
 
     if not unique:
-        raise HTTPException(status_code=404, detail="No data found.")
+        raise HTTPException(status_code=404, detail="No valid housing data found.")
 
     return unique
