@@ -16,7 +16,7 @@ function ZipSearch({ onResults }) {
     setLoading(true);
 
     try {
-      const API_URL = "https://YOUR-BACKEND-NAME.onrender.com";
+      const API_URL = "https://renomaxb.onrender.com";
 
       const res = await fetch(`${API_URL}/housing/${zip}`);
 
